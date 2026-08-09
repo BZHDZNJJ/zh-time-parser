@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zh-time-parser"
+version = "0.1.0"
+description = "中文自然语言时间表达解析器：把「上个月」「最近7天」「Q1」解析为具体日期范围，零依赖。"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+keywords = ["chinese", "date", "time", "parser", "nlp", "中文", "日期解析"]
+authors = [{ name = "BZHDZNJJ" }]
+maintainers = [{ name = "BZHDZNJJ" }]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: Chinese (Simplified)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Linguistic",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/BZHDZNJJ/zh-time-parser"
+Repository = "https://github.com/BZHDZNJJ/zh-time-parser"
+Issues = "https://github.com/BZHDZNJJ/zh-time-parser/issues"
+Changelog = "https://github.com/BZHDZNJJ/zh-time-parser/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.4",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.ruff]
+# 放宽到 120：源码含大量中文行尾注释，CJK 字符视觉宽度是 ASCII 的两倍，
+# 按 100 收窄会迫使重排解析逻辑本身，风险大于收益。
+line-length = 120
+target-version = "py38"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes（未定义名、未使用导入 —— 正是拆分时踩过的坑）
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "BLE",  # flake8-blind-except（禁止裸 except Exception）
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 测试里为验证异常传播，故意引用未定义名
+"tests/test_error_propagation.py" = ["F821"]
