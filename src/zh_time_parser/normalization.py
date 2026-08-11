@@ -45,9 +45,9 @@ def _parse_cn_number(s: str) -> Optional[int]:
     # 阿拉伯数字
     if s.isdigit():
         return int(s)
-    # 中文"几" → 当作 2（默认值，避免返回 None 导致跳过）
+    # “几”是未指定数量，不能替用户猜成任何具体数字。
     if s == '几':
-        return 2
+        return None
     # 中文"十几" → 10 + 个位
     if s.startswith('十') and len(s) == 2 and s[1] in _CN_DIGITS:
         return 10 + _CN_DIGITS[s[1]]

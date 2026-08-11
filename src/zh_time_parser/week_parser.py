@@ -29,7 +29,12 @@ _WEEKDAY_MAP = {
 }
 
 
-def _resolve_week_offset(token: str) -> int:
+def _weekday_offset(weekday: int, week_start: str) -> int:
+    """把固定的周一索引转换为当前周起始口径下的天数偏移。"""
+    return weekday if week_start == 'monday' else (weekday + 1) % 7
+
+
+def _resolve_week_offset(token: str) -> Optional[int]:
     """把'本周/上周/下周/上上周'解析为 offset 周数；不匹配返回 None"""
     t = token.strip()
     if not t or re.fullmatch(r'(本|这|当前)?(周|星期|礼拜)', t) or t == '':
@@ -77,8 +82,8 @@ def _parse_week_day_range(msg: str, today: datetime,
             return None
         s_week_l, _ = _week_range(today, off_l, week_start)
         s_week_r, _ = _week_range(today, off_r, week_start)
-        s = s_week_l + timedelta(days=i1)
-        e = s_week_r + timedelta(days=i2)
+        s = s_week_l + timedelta(days=_weekday_offset(i1, week_start))
+        e = s_week_r + timedelta(days=_weekday_offset(i2, week_start))
         if s > e:
             return None
         return DateRange(_fmt(s), _fmt(e), range_type='range', granularity='day',
@@ -100,8 +105,8 @@ def _parse_week_day_range(msg: str, today: datetime,
         if i1 is None or i2 is None or i1 > i2:
             return None
         s_week, _ = _week_range(today, 0, week_start)
-        s = s_week + timedelta(days=i1)
-        e = s_week + timedelta(days=i2)
+        s = s_week + timedelta(days=_weekday_offset(i1, week_start))
+        e = s_week + timedelta(days=_weekday_offset(i2, week_start))
         return DateRange(_fmt(s), _fmt(e), range_type='range', granularity='day',
                          original_text=m.group(0),
                          label=f'本周周{d1_raw}到周{d2_raw}',

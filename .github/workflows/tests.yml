@@ -30,5 +30,13 @@ jobs:
       - name: Lint with ruff
         run: python -m ruff check src tests
 
+      - name: Type-check public package
+        if: matrix.python-version == '3.12'
+        run: python -m mypy src/zh_time_parser
+
       - name: Run pytest
         run: python -m pytest tests -v
+
+      - name: Build release artifacts
+        if: matrix.python-version == '3.12'
+        run: python -m build --no-isolation

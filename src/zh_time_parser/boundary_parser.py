@@ -96,7 +96,7 @@ def _parse_as_of_point(msg: str, today: datetime) -> Optional[DateRange]:
     #      同时支持"上上月/上月/下月 + 底/末"与"上上月底"连写两种写法。
     m = re.search(r'(?:到|截至|截止)\s*(去年|今年|明年|上上[个]?月|上[个]?月|下[个]?月)\s*(?:底|末|年底|年末)', msg)
     if m:
-        offset_word = m.group(1)
+        offset_word = m.group(1).replace('个', '')
         if offset_word == "去年":
             y = today.year - 1
             d = datetime(y, 12, 31)
@@ -142,7 +142,9 @@ def _parse_as_of_point(msg: str, today: datetime) -> Optional[DateRange]:
     #    必须放在指定年月规则之后，否则"到12月底"会被这里抢成当前月。
     m = re.search(r'(?:到|截至|截止)\s*(?:本)?\s*(年底|年末|月底|月末)', msg)
     if not m:
-        m = re.search(r'(?:本)\s*(年底|年末)|(?:本)?\s*(月底|月末)', msg)
+        # 防止“13月底”这类非法指定月跳过上面的范围校验后，又被后缀
+        # “月底”误当成当前月月底。
+        m = re.search(r'(?:本)\s*(年底|年末)|(?<!\d)(?:本)?\s*(月底|月末)', msg)
     if m:
         token = m.group(1) or m.group(2)
         if token in ('月底', '月末'):

@@ -40,6 +40,7 @@ import re
 from datetime import datetime
 from typing import Optional, Tuple
 
+from .ambiguous_temporal_parser import extract_ambiguous_temporal
 from .boundary_parser import _parse_as_of_point, _parse_misc
 from .explicit_parser import (
     _parse_chinese_date_range,
@@ -60,7 +61,9 @@ from .quarter_parser import (
     _parse_quarter_range,
     _parse_quarter_span,
 )
+from .range_safety import _has_multiple_range_connectors
 from .relative_parser import _parse_relative_time, _parse_single_day
+from .temporal_shift_parser import _parse_temporal_shift
 from .week_parser import (
     _parse_week,
     _parse_week_day_range,
@@ -127,12 +130,39 @@ def extract_date_range_v2(user_message: str, today: Optional[datetime] = None,
     提示调用方改用 extract_comparison_range()。comparison_parser 会先剥离比较词再调用本函数，
     因此「本月同比」等正常比较解析不受影响（传入的是剥离后的「本月」）。
     """
+    if not isinstance(user_message, str):
+        raise TypeError('user_message 必须是 str')
+    if week_start not in ('monday', 'sunday'):
+        raise ValueError("week_start 必须是 'monday' 或 'sunday'")
     if today is None:
         today = datetime.now()
 
     msg = user_message.strip()
     if not msg:
         return DateRange(recognition_status='no_time_phrase')
+
+    # 模糊时间防猜保护：识别出意图，但不把“几天”等擅自换算成固定数值。
+    # 调用方可用 extract_ambiguous_temporal() 获取 direction/unit 后自行追问或应用策略。
+    ambiguous = extract_ambiguous_temporal(msg)
+    if ambiguous:
+        return DateRange(
+            original_text=msg,
+            label='模糊时间表达请使用 extract_ambiguous_temporal',
+            range_type='unknown',
+            confidence=0.0,
+            recognition_status='ambiguous',
+        )
+
+    # 单个 DateRange 无法安全表达“从3月到5月到昨天”这类多连接符结构。
+    # 与其静默丢掉前半段并只返回“昨天”，不如明确拒绝并让上层澄清。
+    if _has_multiple_range_connectors(msg):
+        return DateRange(
+            original_text=msg,
+            label='包含多个范围连接符，无法确定唯一日期区间',
+            range_type='unknown',
+            confidence=0.0,
+            recognition_status='phrase_not_supported',
+        )
 
     # 明确比较表达拦截：避免 extract_date_range_v2("去年同期") 误返回去年全年、
     # extract_date_range_v2("上月环比") 误只返回上个月。
@@ -144,6 +174,39 @@ def extract_date_range_v2(user_message: str, today: Optional[datetime] = None,
             confidence=0.0,
             recognition_status='phrase_not_supported',
         )
+
+    # 句首明确使用“到/截至/截止”的结构化端点时，先保留 point/boundary 语义，
+    # 避免“到本月15号”被普通相对月日期提前解析成无边界的单日，或
+    # “截至上上月底”被组合月份位移提前解析成普通月份范围。
+    if re.match(r'^(?:到|截至|截止)', msg):
+        try:
+            as_of = _parse_as_of_point(msg, today)
+        except _INPUT_ERRORS:
+            as_of = None
+        if as_of:
+            as_of.recognition_status = 'ok'
+            return as_of
+
+        # 已明确写出日历端点、但值本身非法时，不能继续降级成“本月”或
+        # “月底”等较宽泛表达，否则会悄悄制造另一个日期。
+        malformed_endpoint = re.match(
+            r'^(?:到|截至|截止)\s*(?:'
+            r'\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*[日号]?|'
+            r'\d{4}[-/]\d{1,2}[-/]\d{1,2}|'
+            r'\d{1,2}\s*月\s*\d{1,2}\s*[日号]?|'
+            r'(?:这个月|本月|当月)\s*\d{1,2}\s*[日号]|'
+            r'\d{1,2}\s*(?:月底|月末|最后一天)'
+            r')',
+            msg,
+        )
+        if malformed_endpoint:
+            return DateRange(
+                original_text=msg,
+                label='截止点日期无效',
+                range_type='unknown',
+                confidence=0.0,
+                recognition_status='phrase_not_supported',
+            )
 
     # 检测用户原话是否包含时间词（用于设置 recognition_status）
     has_time_phrase = bool(re.search(
@@ -177,6 +240,9 @@ def extract_date_range_v2(user_message: str, today: Optional[datetime] = None,
         lambda: _parse_week_day_range(msg, today, week_start),
         lambda: _parse_relative_month_day(msg, today),
         lambda: _parse_day_range(msg, today),
+        # 组合月份位移必须晚于“月到今天/相对月具体日”等强规则，但早于普通月/季度，
+        # 避免“上上上个月”被截成“上上个月”、“上个月的下个月”被截成“上个月”。
+        lambda: _parse_temporal_shift(msg, today),
         lambda: _parse_half_year(msg, today),
         lambda: _parse_month_span(msg, today),
         lambda: _parse_quarter_span(msg, today),
@@ -226,8 +292,8 @@ def parse_time_expression(text: str, today: Optional[datetime] = None) -> Option
         today = datetime.now()
 
     result = extract_date_range_v2(text, today)
-    if result:
-        return result.to_tuple()
+    if result and result.start is not None and result.end is not None:
+        return result.start, result.end
     return None
 
 

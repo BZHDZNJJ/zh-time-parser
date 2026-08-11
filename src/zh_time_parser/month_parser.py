@@ -50,9 +50,9 @@ def _resolve_month_token(token: str, today: datetime) -> Optional[Tuple[int, int
         return y, m, '下个月'
 
     # X月 / X月份
-    m = re.fullmatch(r'(\d{1,2})\s*月份?', t)
-    if m:
-        month = int(m.group(1))
+    match = re.fullmatch(r'(\d{1,2})\s*月份?', t)
+    if match:
+        month = int(match.group(1))
         if 1 <= month <= 12:
             return today.year, month, f'{month}月'
 

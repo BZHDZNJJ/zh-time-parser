@@ -28,6 +28,7 @@ zh-time-parser —— 中文自然语言时间表达解析器。
     ('2025-04-01', '2025-06-30')
 """
 
+from .ambiguous_temporal_parser import extract_ambiguous_temporal
 from .comparison_parser import extract_comparison_range
 from .date_parser import (
     DateRange,
@@ -35,14 +36,44 @@ from .date_parser import (
     extract_date_range_v2,
     parse_time_expression,
 )
-from .models import ComparisonRange
+from .datetime_parser import extract_datetime_point
+from .datetime_range_parser import extract_datetime_range
+from .models import (
+    AmbiguousTemporal,
+    ComparisonRange,
+    DateTimePoint,
+    DateTimeRange,
+    RelativeTime,
+    TemporalAnchor,
+    TemporalBoundary,
+    TemporalSelector,
+)
+from .relative_time_parser import extract_relative_time
+from .temporal_anchor_parser import extract_temporal_anchor
+from .temporal_boundary_parser import extract_temporal_boundary
+from .temporal_selector_parser import extract_temporal_selector
 
-__version__ = "0.2.0"
+# 单一版本来源：setuptools 从本属性生成包元数据。
+__version__ = "1.0.0"
 
 __all__ = [
     "DateRange",
+    "DateTimePoint",
+    "DateTimeRange",
+    "RelativeTime",
+    "TemporalSelector",
+    "AmbiguousTemporal",
+    "TemporalBoundary",
+    "TemporalAnchor",
     "ComparisonRange",
     "extract_date_range_v2",
+    "extract_datetime_point",
+    "extract_datetime_range",
+    "extract_relative_time",
+    "extract_temporal_selector",
+    "extract_ambiguous_temporal",
+    "extract_temporal_boundary",
+    "extract_temporal_anchor",
     "extract_date_range",
     "extract_comparison_range",
     "parse_time_expression",

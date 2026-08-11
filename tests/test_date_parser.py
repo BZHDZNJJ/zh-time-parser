@@ -1,5 +1,8 @@
 """
-date_parser.py 冒烟测试 —— 覆盖常见时间表达，防止回归。
+DateRange 补充冒烟测试 —— 用不同锚点覆盖跨月、跨年和组合输入。
+
+完整的逐规则契约位于 test_date_parse.py；本文件只保留端到端代表样例和
+主矩阵未覆盖的组合场景，避免两套完整测试长期漂移。
 运行: pytest tests/test_date_parser.py -v
 """
 from datetime import datetime
@@ -138,8 +141,8 @@ class TestThisPastYears:
 
     def test_past_several_years(self):
         r = extract_date_range_v2("前几年", TODAY)
-        assert r.start == "2024-06-23"
-        assert r.end == "2026-06-23"
+        assert not r
+        assert r.recognition_status == "ambiguous"
 
 
 class TestYearUntilNow:
@@ -283,7 +286,7 @@ class TestRecognitionStatus:
 
     def test_phrase_not_supported(self):
         r = extract_date_range_v2("前阵子", TODAY)
-        assert r.recognition_status == "phrase_not_supported"
+        assert r.recognition_status == "ambiguous"
 
 
 class TestEdgeCases:

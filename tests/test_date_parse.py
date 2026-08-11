@@ -1,10 +1,11 @@
 """
-日期解析测试 v2 — 验证 extract_date_range_v2() 和向后兼容的 extract_date_range()。
+DateRange 主契约与完整规则回归 —— 验证结构化 API 和旧 API 的兼容行为。
 
 运行方式：
     python -m pytest tests/test_date_parse.py -v
 
 策略：
+- 本文件是按解析维度组织的完整契约矩阵；不要在补充冒烟文件重复同一组参数
 - 精确值断言：用于硬性日期（"2026-04-01 至 2026-04-30"、"2025年"）
 - 固定 today 注入：用于相对日期（"上个月"、"最近7天"），保证测试可重复
 - 涉及"今天"等动态日期，仅断言结构（start/end 都不为 None）
@@ -934,4 +935,3 @@ class TestYearRange:
         r = extract_date_range_v2("2025年到今年", today=FIXED_TODAY)
         assert r.start == "2025-01-01"
         assert r.end == "2026-05-24"
-

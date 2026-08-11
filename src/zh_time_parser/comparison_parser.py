@@ -230,6 +230,8 @@ def _build_comparison(current: DateRange, gran: str,
     """
     根据本期区间与粒度算出对比期区间。无法计算时返回 None。
     """
+    if current.start is None or current.end is None:
+        return None
     start = datetime.strptime(current.start, '%Y-%m-%d')
     end = datetime.strptime(current.end, '%Y-%m-%d')
 
@@ -291,10 +293,16 @@ def extract_comparison_range(user_message: str, today: Optional[datetime] = None
     # 放在函数内可避免 import 期循环依赖。
     from .date_parser import extract_date_range_v2
 
+    if user_message is None:
+        return None
+    if not isinstance(user_message, str):
+        raise TypeError('user_message 必须是 str 或 None')
+    if week_start not in ('monday', 'sunday'):
+        raise ValueError("week_start 必须是 'monday' 或 'sunday'")
     if today is None:
         today = datetime.now()
 
-    msg = (user_message or '').strip()
+    msg = user_message.strip()
     if not msg:
         return None
 

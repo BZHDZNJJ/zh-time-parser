@@ -5,10 +5,80 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [1.0.0] - 2026-08-11
 
 ### Added
 
+- **1.0 工程质量门禁**：统一包元数据与运行时版本来源为 `1.0.0`，发布包加入
+  `py.typed`；新增 mypy 源码类型检查、85% 分支覆盖率门禁、Hypothesis 生成式测试、
+  超长输入压力测试、共享时间锚点夹具、打包契约测试及 CI 发布构建验证。
+- 新增 `CONTRIBUTING.md` 与 `CODE_OF_CONDUCT.md`，明确本地开发、DateRange
+  兼容性、测试门禁、PR 检查清单、社区行为和事件处理规则。
+
+- **可组合自然月位移解析**：
+  - 连续「上/下」按出现次数计算月份偏移，支持「上上上个月」「下下下个月」并自动跨年
+  - 月份链逐项求值：「上个月的下个月」回到本月，
+    「上上个月的下个月」得到上个月，不再只截取第一个局部词组
+  - 支持「一季度后的一个月」「一季度后的下一个月」「Q4后的一个月」及
+    「2025年第四季度后的一个月」等季度结束后首个自然月
+  - 组合结果回到当前月时沿用既有本月 MTD 口径；其他目标月返回完整自然月
+- **TemporalAnchor as-of 评估时钟锚点**：
+  - 新增独立数据类 `TemporalAnchor` 和公开 API `extract_temporal_anchor()`
+  - 区分「截至昨天」的 `TemporalBoundary <=` 与「在昨天的时候」的
+    `TemporalAnchor as_of`，避免把状态评估时点误当成记录筛选条件
+  - 支持从完整业务句「到这个月底的时候客户欠款超期金额是多少」中提取
+    `as_of=2026-08-31`，并通过 `is_future` 标记未来评估时点
+  - 支持日期和具体时刻锚点；对「在下个月的时候」这类仍缺具体日期的表达不猜月初/月末
+  - 新入口不修改 `DateRange` / `TemporalBoundary` 的既有行为和返回契约
+- **TemporalBoundary Deadline / Boundary 解析**：
+  - 新增独立数据类 `TemporalBoundary` 和公开 API `extract_temporal_boundary()`
+  - 支持「周五之前」「月底以前」「三天以内」「两小时内」「从明天开始」
+    「下周以后」「截至月底」「最迟周三」等单侧边界
+  - 明确保留 `<` / `<=` / `>` / `>=` 运算符以及 `date` / `datetime` 值类型，
+    不把截止或开始语义降级为普通闭区间
+  - 相对时长边界嵌套保留 `RelativeTime`，便于 SLA/任务系统审计原始 duration
+  - 新入口与原有 `DateRange` 调度链隔离
+- **AmbiguousTemporal 模糊时间识别与防猜保护**：
+  - 新增独立数据类 `AmbiguousTemporal` 和 `extract_ambiguous_temporal()`，支持
+    「最近几天」「最近一段时间」「前段时间」「过几天」「晚一点」「月底左右」「近期」
+  - 输出 `type/status/direction/unit/value`，其中模糊数值 `value` 始终为 `None`
+  - `extract_date_range_v2()` 遇到明确模糊表达时返回空区间和
+    `recognition_status='ambiguous'`，不再把“几天”替换成任意默认数字
+  - 明确数值表达（如「最近7天」）及其他 DateRange 核心规则保持不变
+- **TemporalSelector 事件顺序选择器**：
+  - 新增独立数据类 `TemporalSelector` 和公开 API `extract_temporal_selector()`
+  - 支持「最近一次」「上一次」「最后一次」「第一次」「最早一次」「最近3次」
+    「前3次」「倒数第二次」，输出 `order`、`limit` 和 `offset`
+  - 支持与日期范围组合：「去年最近一次」返回去年 `DateRange + latest/1`，
+    「上个月最近3次」返回上个月 `DateRange + latest/3`
+  - 不猜测事件发生日期，不进入原有日期解析调度链；调用方可选地映射到
+    SQL `ORDER BY / LIMIT / OFFSET`、CRM 或搜索系统
+- **DateTimeRange 时刻区间与旧系统日期投影**：
+  - 新增独立数据类 `DateTimeRange` 和 `extract_datetime_range()`，支持
+    「8月1日至昨天中午」以及「直到昨天中午」这类单侧结束边界
+  - 精确 `start/end` 与兼容旧系统的 `date_start/date_end` 同时保留；
+    有损日期投影通过 `precision_lost=True` 明确标记
+  - `to_date_tuple()` 支持 `calendar_date`、`completed_days`、`reject_lossy` 三种策略，
+    由调用方明确决定多查、少查或拒绝有损执行
+  - 新解析器不进入 `DateRange` 调度链，原有日期范围返回契约保持不变
+- **RelativeTime 相对时长解析**：
+  - 新增独立数据类 `RelativeTime` 和公开 API `extract_relative_time(user_message, anchor=None)`；
+    不接入原有日期范围或日期时刻调度链
+  - 支持「半小时后」「10分钟后」「3天后」「两周前」「一个月以后」
+    「过两小时」「再过三天」等锚点偏移表达
+  - 结果同时保留标准化的 `value`、`unit`、`direction` 和精确到分钟的 `resolved_at`
+  - 月份使用真实日历平移并安全处理月末，不使用固定 30 天近似
+  - 新增 RelativeTime 模型、解析规则、月末和 DateRange 隔离回归测试
+- **DateTimePoint 日期时刻解析**：
+  - 新增独立数据类 `DateTimePoint` 和公开 API `extract_datetime_point()`；不接入
+    `extract_date_range_v2()` 调度链，保持 `DateRange` 返回契约和核心日期范围行为不变
+  - 支持相对日、周几、显式年月日与中文时段/钟点组合，包括「明天下午3点」
+    「今天晚上8点半」「下周三上午10点」「8月20日14:30」「后天凌晨2点」
+  - 「今晚」「明早」分别使用 20:00、08:00 的约定值，并以较低置信度和
+    `precision='period'` 明确标记
+  - 支持「昨天中午」「前天晚上8点」「昨晚」「今早」等过去日期 + 时段组合，
+    避免过去日期被错误回落到今天
+  - 新增日期时刻与 DateRange 隔离回归测试
 - **H1/H2 半年表达**（大小写均支持）：
   - 无年份 `H1` / `h1` / `H2` / `h2` → 当年上/下半年，`is_relative=True`
   - 指定年份 `2025H1` / `2025 H1` / `2025年H1` → `is_relative=False`
@@ -41,6 +111,24 @@
 
 ### Fixed
 
+- **DateRange 截止点优先级与非法降级修复**：句首「到/截至/截止 + 结构化日期」
+  现在优先保留 `point` / `boundary='end'`，不再被普通月份规则提前截走；
+  「截至上个月底」正确处理可选「个」及跨年；「截至13月底」「截至本月32号」
+  不再悄悄退化为当前月底或本月范围。
+
+- **模糊数量不再默认等于 2**：`_parse_cn_number('几')` 现返回 `None`；
+  「近几年」「前几年」「最近几周/几个月」「过几小时/分钟」统一交给
+  `AmbiguousTemporal` 并保持 `value=None`。明确数字表达不受影响。
+- **多范围连接符不再静默返回部分结果**：「从3月到5月到昨天」此前可能只返回
+  「昨天」或单侧结束边界，现由 `DateRange` / `DateTimeRange` 明确返回不支持。
+  「到期」等普通业务词中的“到”不会被计作范围连接符。
+- **Sunday 周内日期偏移修复**：`week_start='sunday'` 时，「本周一到周五」此前
+  错算为周日到周四，现正确按周日起始口径转换周几偏移。
+- `TemporalSelector` 在复用 `DateRange` 前会清理「在/于」「范围内/里/期间」等
+  日期上下文连接词。
+- 所有公开解析入口补充非字符串输入契约测试；支持 `week_start` 的入口统一拒绝非法值。
+- 新增 Sunday 起始周测试矩阵，覆盖周范围、周内日期段、周至今、日期时刻、
+  带时刻区间和边界解析。
 - **同比/环比此前完全无法识别**，且会给出误导性结果：
   - 「去年同期」错误退化为**去年全年**，现返回今年至今 vs 去年同期两个区间
   - 「今年同比去年」只解析出今年，现返回两个区间
@@ -117,17 +205,15 @@
   `models.py` / `boundary_parser.py` 注释中的 `debt`、「欠款」「超期」等下游业务描述
   改为中性表述。
 
-### 待决
+### 1.x 稳定语义
 
-- 「本月/本季度」返回完整周期还是截至今天（现状不一致）
-- 「最近 N 月」是滑动月份还是完整自然月（现状为滑动）
-- 端点是否包含（`includes_end` 现状恒为 `True`）
-- 两位年份解释规则（现状一律补 `20`，`99年 → 2099`）
+- 「本月/今年」保持 MTD/YTD；「本周/本季度」保持完整自然周期
+- 「最近 N 月」保持滑动窗口；日期端点保持闭区间（`includes_end=True`）
+- 两位年份保持补 `20`（`99年 → 2099`）
 - `DateRange.range_type` 的 `'yoy'` / `'mom'` 取值已不可达，
-  本次**刻意保留不删**以免破坏兼容性，建议下个 major 版本清理
-- 跨年份半年范围（`2025H2到2026H1`）待补齐顺序校验与测试后开放
-- 单独出现的「同比」「环比」当前采用默认周期（YTD / 本月至今），
-  是否应改为返回 `None` 要求调用方明确指定
+  1.x 保留以避免破坏兼容性；下个 major 版本再评估清理
+- 跨年份半年范围（`2025H2到2026H1`）在 1.x 保持不支持
+- 单独「同比」「环比」保持默认周期（YTD / 本月至今）
 
 详见 [DESIGN.md](DESIGN.md)。
 

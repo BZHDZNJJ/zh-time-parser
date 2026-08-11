@@ -6,7 +6,9 @@ dist/
 .pytest_cache/
 .ruff_cache/
 .coverage
+coverage.json
 htmlcov/
+.hypothesis/
 .venv/
 venv/
 .idea/
